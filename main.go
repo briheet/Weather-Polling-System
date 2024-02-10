@@ -26,13 +26,13 @@ type WeatherData struct {
 
 type WPoller struct {
 	closech chan struct{}
-	sender  Sender
+	senders []Sender
 }
 
-func NewWPoller(sender Sender) *WPoller {
+func NewWPoller(senders ...Sender) *WPoller {
 	return &WPoller{
 		closech: make(chan struct{}),
-		sender:  sender,
+		senders: senders,
 	}
 }
 
@@ -50,36 +50,91 @@ func NewSmsSender(number string) *SmsSender {
 	}
 }
 
+type emailSender struct {
+	email string
+}
+
+func NewEmailSender(email string) *emailSender {
+	return &emailSender{
+		email: email,
+	}
+}
+
 func (s *SmsSender) Send(data *WeatherData) error {
 	fmt.Println("sending data to the number", s.number)
 	return nil
 }
 
-func (wp *WPoller) start() {
-	fmt.Println("starting WPoller")
-	ticker := time.NewTicker(poller)
-free:
-	for {
-		select {
-		case <-ticker.C:
-			data, err := getWeatherResults(28.44, 77.88)
-			if err != nil {
-				log.Fatal(err)
-			}
-			if err := wp.handleData(data); err != nil {
-				log.Fatal(err)
-			}
+func (em *emailSender) Send(data *WeatherData) error {
+	fmt.Println("sending data to the email", em.email)
+	return nil
+}
 
-		case <-wp.closech:
-			break free
+//func (wp *WPoller) start() {
+//	fmt.Println("starting WPoller")
+//	ticker := time.NewTicker(poller)
+//free:
+//	for {
+//		select {
+//		case <-ticker.C:
+//			data, err := getWeatherResults(28.44, 77.88)
+//			if err != nil {
+//				log.Fatal(err)
+//			}
+//			if err := wp.handleData(data); err != nil {
+//				log.Fatal(err)
+//			}
+//
+//		case <-wp.closech:
+//			break free
+//		}
+//	}
+//
+//	fmt.Println("wpoller stopped")
+//}
+
+func weatherHandler(w http.ResponseWriter, r *http.Request) {
+	lat := 28.44
+	long := 77.88
+
+	data, err := getWeatherResults(lat, long)
+	if err != nil {
+		http.Error(w, "Failed to get weather data", http.StatusInternalServerError)
+		return
+	}
+
+	currentTime := time.Now().Format("2006-01-02T15:00") // Get current time in the required format
+
+	// Find index of the current time in the data
+	index := -1
+	for i, t := range data.Hourly["time"].([]interface{}) {
+		if t.(string) == currentTime {
+			index = i
+			break
 		}
 	}
 
-	fmt.Println("wpoller stopped")
-}
+	if index != -1 {
+		temp := data.Hourly["temperature_2m"].([]interface{})[index].(float64)
+		fmt.Printf("Current temperature at %s is %.2f\n", currentTime, temp)
 
-func (wp *WPoller) handleData(data *WeatherData) error {
-	return wp.sender.Send(data)
+		// Create a new WeatherData instance with only current time and temperature
+		currentWeather := &WeatherData{
+			Elevation: data.Elevation,
+			Hourly: map[string]any{
+				"time":        currentTime,
+				"temperature": temp,
+			},
+		}
+
+		// Encode and send the current weather data
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(currentWeather)
+	} else {
+		fmt.Printf("Current time %s not found in weather data\n", currentTime)
+		http.Error(w, "Current time not found in weather data", http.StatusNotFound)
+	}
 }
 
 func getWeatherResults(lat, long float64) (*WeatherData, error) {
@@ -99,11 +154,12 @@ func getWeatherResults(lat, long float64) (*WeatherData, error) {
 }
 
 func main() {
-	smsSender := NewSmsSender("+917379745969")
-	wpoller := NewWPoller(smsSender)
-	go wpoller.start()
+	//	smsSender := NewSmsSender("+917379745969")
+	//	emailSender := NewEmailSender("briheetyadav@gmail.com")
+	//	wpoller := NewWPoller(smsSender, emailSender)
+	//	wpoller.start()
 
-	time.Sleep(time.Minute * 1)
-
-	wpoller.Stop()
+	fmt.Println("starting port at :8080")
+	http.HandleFunc("/weather", weatherHandler)
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
