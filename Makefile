@@ -1,7 +1,7 @@
-run:
-	@go build
-	@go run .
+run: build
+	go run .
+
 
 build:
-	@go build 
+	go build .
 
