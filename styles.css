@@ -1,0 +1,23 @@
+body{
+    margin:0;
+    font-family:'Rubik',sans-serif;
+    background:#111;
+}
+*{
+    box-sizing: border-box;
+
+}
+h1,h3{
+    font-weight:400;
+}
+.weather-app{
+    min-height:100vh;
+    background-image:url("https://images.unsplash.com/photo-1536244636800-a3f74db0f3cf?q=80&w=1992&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
+    background-position:center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    color:#fff;
+    position:relative;
+    transition:500ms;
+
+}
